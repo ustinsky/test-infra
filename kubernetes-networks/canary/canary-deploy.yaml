@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-v2           # Название нашего объекта Deployment
+spec:
+  replicas: 3               # Начнем с одного пода
+  selector:                 # Укажем, какие поды относятся к нашему Deployment:
+    matchLabels:            # - это поды с меткой
+      app: webapp-v2        # app и ее значением web
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1%
+  template:                 # Теперь зададим шаблон конфигурации пода
+    metadata:
+      name: webapp-v2                                       # Название Pod
+      labels:                                               # Метки в формате key: value
+        app: webapp-v2
+    spec:                                                   # Описание Pod
+      containers:                                           # Описание контейнеров внутри Pod
+      - name: webapp-v2                                     # Название контейнера
+        image: austinsky/example-go-httpd-alpine:v0.0.1     # Образ из которого создается контейнер
+        readinessProbe:
+          httpGet:
+            path: /index.html
+            port: 8000
+        livenessProbe:
+          tcpSocket: { port: 8000 }
+        volumeMounts:
+        - name: app
+          mountPath: /app
+      initContainers:
+      - name: initialize-index-htnl
+        image: busybox:1.31.0
+        command: ['sh', '-c', 'echo "v2" >> /app/index.html']
+        volumeMounts:
+        - name: app
+          mountPath: /app
+      volumes:
+      - name: app
+        emptyDir: {}
