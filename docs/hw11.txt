@@ -1,0 +1,602 @@
+Домашнее задание 11 Vault
+    1. Инсталляция hashicorp vault HA 
+        1.1 Склонируем репозитории
+            1.1.1 Consul
+                git clone https://github.com/hashicorp/consul-helm.git
+                helm install --name=consul consul-helm
+
+            1.1.2 Vault
+                git clone https://github.com/hashicorp/vault-helm.git
+
+            1.1.3 Отредактируем values.yaml
+                standalone:
+                enabled: false
+                ....
+                ha:
+                enabled: true
+                ...
+                ui:
+                enabled: true
+                serviceType: "ClusterIP"
+
+            1.1.4 Установим Vault
+                helm install --name=vault .
+                helm status vault
+                kubectl logs vault-0
+
+            1.1.5 Проведем инициализацию
+                kubectl exec -it vault-0 -- vault operator init --key-shares=1 --key-threshold=1
+                ...
+                Unseal Key 1: fkd+NfDzTRfHY3Es7M2Bxg6n/e3l9PHz62aZWekfRfM=
+                Initial Root Token: s.w24RLZaYVsPSVDLWXpvKNjYq
+
+                Unseal Key 1: XAzxASja9W5QLtiFWrL+GhWGq3eb02dpfKZhdOrjMQU=
+                Initial Root Token: s.AzVdqMfpzQBh151wyKCnvYAf
+                ...
+
+            1.1.6 Проверим состояние vault
+                kubectl logs vault-0
+                kubectl exec -it vault-0 -- vault status
+
+            1.1.7 Распечатать vault
+                kubectl exec -it vault-0 env | grep VAULT
+
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-0 env | grep VAULT
+                VAULT_ADDR=http://127.0.0.1:8200
+
+                kubectl exec -it vault-0 -- vault operator unseal
+
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-0 -- vault operator unseal
+                Unseal Key (will be hidden): 
+                Key                    Value
+                ---                    -----
+                Seal Type              shamir
+                Initialized            true
+                Sealed                 false
+                Total Shares           1
+                Threshold              1
+                Version                1.2.4
+                Cluster Name           vault-cluster-4bc57fde
+                Cluster ID             7d07845c-9370-9d3c-f596-0d74c286e34c
+                HA Enabled             true
+                HA Cluster             n/a
+                HA Mode                standby
+                Active Node Address    <none>
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-1 -- vault operator unseal
+                Unseal Key (will be hidden): 
+                Key                    Value
+                ---                    -----
+                Seal Type              shamir
+                Initialized            true
+                Sealed                 false
+                Total Shares           1
+                Threshold              1
+                Version                1.2.4
+                Cluster Name           vault-cluster-4bc57fde
+                Cluster ID             7d07845c-9370-9d3c-f596-0d74c286e34c
+                HA Enabled             true
+                HA Cluster             https://10.44.2.7:8201
+                HA Mode                standby
+                Active Node Address    http://10.44.2.7:8200
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-2 -- vault operator unseal
+                Unseal Key (will be hidden): 
+                Key                    Value
+                ---                    -----
+                Seal Type              shamir
+                Initialized            true
+                Sealed                 false
+                Total Shares           1
+                Threshold              1
+                Version                1.2.4
+                Cluster Name           vault-cluster-4bc57fde
+                Cluster ID             7d07845c-9370-9d3c-f596-0d74c286e34c
+                HA Enabled             true
+                HA Cluster             https://10.44.2.7:8201
+                HA Mode                standby
+                Active Node Address    http://10.44.2.7:8200
+
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-0 -- vault status
+                Key             Value
+                ---             -----
+                Seal Type       shamir
+                Initialized     true
+                Sealed          false
+                Total Shares    1
+                Threshold       1
+                Version         1.2.4
+                Cluster Name    vault-cluster-4bc57fde
+                Cluster ID      7d07845c-9370-9d3c-f596-0d74c286e34c
+                HA Enabled      true
+                HA Cluster      https://10.44.2.7:8201
+                HA Mode         active
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-1 -- vault status
+                Key                    Value
+                ---                    -----
+                Seal Type              shamir
+                Initialized            true
+                Sealed                 false
+                Total Shares           1
+                Threshold              1
+                Version                1.2.4
+                Cluster Name           vault-cluster-4bc57fde
+                Cluster ID             7d07845c-9370-9d3c-f596-0d74c286e34c
+                HA Enabled             true
+                HA Cluster             https://10.44.2.7:8201
+                HA Mode                standby
+                Active Node Address    http://10.44.2.7:8200
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-2 -- vault status
+                Key                    Value
+                ---                    -----
+                Seal Type              shamir
+                Initialized            true
+                Sealed                 false
+                Total Shares           1
+                Threshold              1
+                Version                1.2.4
+                Cluster Name           vault-cluster-4bc57fde
+                Cluster ID             7d07845c-9370-9d3c-f596-0d74c286e34c
+                HA Enabled             true
+                HA Cluster             https://10.44.2.7:8201
+                HA Mode                standby
+                Active Node Address    http://10.44.2.7:8200
+
+            1.1.8 Посмотрим список возможных авторизаций (получим ошибку)
+                kubectl exec -it vault-0 -- vault auth list
+
+            1.1.9 Залогинимся
+                kubectl exec -it vault-0 -- vault login
+                kubectl exec -it vault-0 -- vault auth list
+
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-0 -- vault auth list
+                Path      Type     Accessor               Description
+                ----      ----     --------               -----------
+                token/    token    auth_token_a899df07    token based credentials
+
+        1.2 Поработаем с Vault
+            1.2.1 Заведем секреты
+                kubectl exec -it vault-0 -- vault secrets enable --path=otus kv
+                kubectl exec -it vault-0 -- vault secrets list --detailed
+                kubectl exec -it vault-0 -- vault kv put otus/otus-ro/config username='otus' password='asajkjkahs' 
+                kubectl exec -it vault-0 -- vault kv put otus/otus-rw/config username='otus' password='asajkjkahs'
+                kubectl exec -it vault-0 -- vault read otus/otus-ro/config
+                kubectl exec -it vault-0 -- vault kv get otus/otus-rw/config
+
+
+
+
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-0 -- vault secrets enable --path=otus kv
+                Success! Enabled the kv secrets engine at: otus/
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-0 -- vault secrets list --detailed
+                Path          Plugin       Accessor              Default TTL    Max TTL    Force No Cache    Replication    Seal Wrap    Options    Description                                                UUID
+                ----          ------       --------              -----------    -------    --------------    -----------    ---------    -------    -----------                                                ----
+                cubbyhole/    cubbyhole    cubbyhole_c26623b4    n/a            n/a        false             local          false        map[]      per-token private secret storage                           610717ab-94bd-469a-1616-d024bdff9e46
+                identity/     identity     identity_ec91bbb4     system         system     false             replicated     false        map[]      identity store                                             91b64f8d-b23a-82da-249f-6dc231884c25
+                otus/         kv           kv_582d2cf0           system         system     false             replicated     false        map[]      n/a                                                        d0b77d0d-7005-5f8b-23a8-233832728e6e
+                sys/          system       system_958a2685       n/a            n/a        false             replicated     false        map[]      system endpoints used for control, policy and debugging    7224c6a0-1fd2-9d5d-8f13-c79128a499e5
+                
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-0 -- vault kv put otus/otus-ro/config username='otus' password='asajkjkahs'
+                Success! Data written to: otus/otus-ro/config
+                
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-0 -- vault kv put otus/otus-rw/config username='otus' password='asajkjkahs'
+                Success! Data written to: otus/otus-rw/config
+                
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-0 -- vault read otus/otus-ro/config
+                Key                 Value
+                ---                 -----
+                refresh_interval    768h
+                password            asajkjkahs
+                username            otus
+                
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-0 -- vault kv get otus/otus-rw/config
+                ====== Data ======
+                Key         Value
+                ---         -----
+                password    asajkjkahs
+                username    otus
+
+            1.2.2 Включаем авторизацию через kubernetes
+                kubectl exec -it vault-0 -- vault auth enable kubernetes
+                kubectl exec -it vault-0 -- vault auth list
+
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-0 -- vault auth enable kubernetes
+                Success! Enabled kubernetes auth method at: kubernetes/
+                lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-helm$ kubectl exec -it vault-0 -- vault auth list
+                Path           Type          Accessor                    Description
+                ----           ----          --------                    -----------
+                kubernetes/    kubernetes    auth_kubernetes_1c9624bf    n/a
+                token/         token         auth_token_a899df07         token based credentials
+
+            1.2.3 Создадим Service Account и применим ClusterRoleBinding
+                kubectl create serviceaccount vault-auth
+                kubectl apply --filename vault-auth-service-account.yml
+
+            1.2.4 Настроим переменные среды
+                export VAULT_SA_NAME=$(kubectl get sa vault-auth -o jsonpath="{.secrets[*]['name']}")
+                export SA_JWT_TOKEN=$(kubectl get secret $VAULT_SA_NAME -o jsonpath="{.data.token}" | base64 --decode; echo)
+                export SA_CA_CRT=$(kubectl get secret $VAULT_SA_NAME -o jsonpath="{.data['ca\.crt']}" | base64 --decode; echo)
+                export K8S_HOST=$(more ~/.kube/config | grep server | awk '/http/ {print $NF}')
+                
+                ### alternative way
+                export K8S_HOST=$(kubectl cluster-info | grep "Kubernetes\ master" | awk ‘/https/ {print $NF}’ | sed ’s/\x1b\[[0-9;]*m//g’ )
+                export K8S_HOST=$(kubectl cluster-info | grep "Kubernetes\ master" | awk '/https/ {print $NF}' | sed 's/\x1b\[[0-9;]*m//g' )
+            
+                Вопрос: что делает эта конструкция sed ’s/\x1b\[[0-9;]*m//g’ 
+                Ответ: убирает цвет у ответа(убирает escape-последовательность)
+
+            1.2.5 Запишем конфиг в vault
+                kubectl exec -it vault-0 -- vault write auth/kubernetes/config \
+                    token_reviewer_jwt="$SA_JWT_TOKEN" \
+                    kubernetes_host="$K8S_HOST" \
+                    kubernetes_ca_cert="$SA_CA_CRT"
+
+            1.2.6 Создаем политику и роль в vault
+                kubectl cp otus-policy.hcl vault-0:./ (Не работает команда)
+                ---
+                kubectl cp otus-policy.hcl vault-0:/tmp/
+                ---
+                
+                kubectl exec -it vault-0 -- vault policy write otus-policy /otus-policy.hcl
+                ---
+                kubectl exec -it vault-0 -- vault policy write otus-policy /tmp/otus-policy.hcl
+                ---
+                
+                kubectl exec -it vault-0 -- vault write auth/kubernetes/role/otus \
+                bound_service_account_names=vault-auth \
+                bound_service_account_namespaces=default policies=otus-policy ttl=24h
+
+            1.2.7 Проверим как работает авторизация
+
+                1.2.7.1 создадим под с привязанным сервис аккоунтом и установим туда curl и jq
+                    kubectl run --generator=run-pod/v1 tmp --rm -i --tty --serviceaccount=vault-auth --image alpine:3.8
+                    apk add curl jq
+
+                1.2.7.2 Залогинимся и получим клиентский токен
+                    VAULT_ADDR=http://vault:8200
+                    KUBE_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+                    curl --request POST --data '{"jwt": "'$KUBE_TOKEN'", "role": "otus"}' $VAULT_ADDR/v1/auth/kubernetes/login | jq
+                    TOKEN=`curl -s --request POST --data '{"jwt": "'$KUBE_TOKEN'", "role": "otus"}' $VAULT_ADDR/v1/auth/kubernetes/login | jq '.auth.client_token'`
+                    s.3Vr7CIvPNLmtAxpCOJY281Zi"
+
+            1.2.8 прочитаем ранее полученные секреты и попробуем их обновить
+                1.2.8.1 Проверим чтение
+                    curl --header "X-Vault-Token:s.dBnF1BaDGRIwW4moQwnHIHIc" $VAULT_ADDR/v1/otus/otus-ro/config
+                    curl --header "X-Vault-Token:s.dBnF1BaDGRIwW4moQwnHIHIc" $VAULT_ADDR/v1/otus/otus-rw/config
+
+                    curl --header "X-Vault-Token:s.3Vr7CIvPNLmtAxpCOJY281Zi" $VAULT_ADDR/v1/otus/otus-ro/config
+                    curl --header "X-Vault-Token:s.3Vr7CIvPNLmtAxpCOJY281Zi" $VAULT_ADDR/v1/otus/otus-rw/config                    
+
+                1.2.8.2 Проверим запись 
+                    curl --request POST --data '{"bar": "baz"}' --header "X-Vault-Token:s.3Vr7CIvPNLmtAxpCOJY281Zi" $VAULT_ADDR/v1/otus/otus-ro/config
+                    curl --request POST --data '{"bar": "baz"}' --header "X-Vault-Token:s.3Vr7CIvPNLmtAxpCOJY281Zi" $VAULT_ADDR/v1/otus/otus-rw/config
+                    curl --request POST --data '{"bar": "baz"}' --header "X-Vault-Token:s.3Vr7CIvPNLmtAxpCOJY281Zi" $VAULT_ADDR/v1/otus/otus-rw/config1
+
+                1.2.8.3 Запись в config не получилась
+                    Почему мы смогли записать otus-rw/config1 но не смогли otus-rw/config ?
+                    Потому что в политиках определены правила 
+                    path "otus/otus-ro/*" {
+                        capabilities = ["read", "list"]
+                    }
+                    path "otus/otus-rw/*" {
+                        capabilities = ["read", "create", "list"]
+                    }
+
+                    Правила определяют что я могу создавать ключи, а менять не могу 
+                    чтобы это исправить на до добавить правил
+                    path "otus/otus-ro/*" {
+                        capabilities = ["read", "list"]
+                    }
+                    path "otus/otus-rw/*" {
+                        capabilities = ["read", "create", "list", "update"]
+                    }
+
+                    kubectl cp otus-policy.hcl vault-0:/tmp/
+                    kubectl exec -it vault-0 -- vault policy write otus-policy /tmp/otus-policy.hcl
+
+                    curl --request POST --data '{"bar": "baz"}' --header "X-Vault-Token:s.dBnF1BaDGRIwW4moQwnHIHIc" $VAULT_ADDR/v1/otus/otus-ro/config
+                    curl --request POST --data '{"bar": "baz"}' --header "X-Vault-Token:s.dBnF1BaDGRIwW4moQwnHIHIc" $VAULT_ADDR/v1/otus/otus-rw/config
+            
+            2. Use case использования авторизации через кубер
+                2.1 Заберем репозиторий
+                    git clone https://github.com/hashicorp/vault-guides.git
+                    cd vault-guides/identity/vault-agent-k8s-demo
+
+                2.2 Запускаем пример
+                    # Create a ConfigMap, example-vault-agent-config
+                    $ kubectl create configmap example-vault-agent-config --from-file=./configs-k8s/
+        
+                    # View the created ConfigMap
+                    $ kubectl get configmap example-vault-agent-config -o yaml
+                
+                    # Finally, create vault-agent-example Pod
+                    $ kubectl apply -f example-k8s-spec.yml --record
+
+                    kubectl exec -it vault-agent-example --container consul-template sh
+                        # echo $(cat /home/vault/.vault-token)
+
+                    kubectl exec -it vault-agent-example --container nginx-container sh
+                        cat /usr/share/nginx/html/index.html
+
+
+                    lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-guides/identity/vault-agent-k8s-demo$ kubectl exec -it vault-agent-example --container consul-template sh
+                    / # 
+                    / # echo $(cat /home/vault/.vault-token)
+                    s.RduXfMCBWXMT4mwpA9j5KpWD
+
+                    lex@mebian:~/Документы/otus-kuber/labs/lab11/vault-guides/identity/vault-agent-k8s-demo$ kubectl exec -it vault-agent-example --container nginx-container sh
+                    # cat /usr/share/nginx/html/index.html
+                    <html>
+                    <body>
+                    <p>Some secrets:</p>
+                    <ul>
+                    <li><pre>username: otus</pre></li>
+                    <li><pre>password: asajkjkahs</pre></li>
+                    </ul>
+                    
+                    </body>
+                    </html>
+                    # 
+
+            3. CA на базе vault
+                
+                3.1 Включим PKI Secrets
+                    kubectl exec -it vault-0 -- vault secrets enable pki
+                    kubectl exec -it vault-0 -- vault secrets tune -max-lease-ttl=87600h pki
+                    kubectl exec -it vault-0 -- vault write -field=certificate pki/root/generate/internal \
+                        common_name="exmaple.ru" ttl=87600h > CA_cert.crt
+
+                3.2 Пропишем URL-ы и СА для отозванных сертификатов
+                    kubectl exec -it vault-0 -- vault write pki/config/urls \
+                        issuing_certificates="http://vault:8200/v1/pki/ca" \
+                        crl_distribution_points="http://vault:8200/v1/pki/crl"
+
+                3.3 Создадим промежуточный сертификат
+                    kubectl exec -it vault-0 -- vault secrets enable --path=pki_int pki
+                    kubectl exec -it vault-0 -- vault secrets tune -max-lease-ttl=87600h pki_int
+                    kubectl exec -it vault-0 -- vault write -format=json \
+                        pki_int/intermediate/generate/internal \
+                        common_name="example.ru Intermediate Authority" | jq -r '.data.csr' > pki_intermediate.csr
+
+                3.4 Пропишем промежуточный сертификат в vault
+                    kubectl cp pki_intermediate.csr vault-0:./ ( У меня не работает)
+                    ---
+                    kubectl cp pki_intermediate.csr vault-0:/tmp 
+                    ---
+
+                    kubectl exec -it vault-0 -- vault write -format=json pki/root/sign-intermediate \
+                    csr=@pki_intermediate.csr \
+                    format=pem_bundle ttl="43800h" | jq -r '.data.certificate' > intermediate.cert.pem
+                    ---
+                    kubectl exec -it vault-0 -- vault write -format=json pki/root/sign-intermediate \
+                    csr=@/tmp/pki_intermediate.csr \
+                    format=pem_bundle ttl="43800h" | jq -r '.data.certificate' > intermediate.cert.pem
+                    ---
+
+
+                    kubectl cp intermediate.cert.pem vault-0:./
+                    ---
+                    kubectl cp intermediate.cert.pem vault-0:/tmp
+                    ---
+
+                    kubectl exec -it vault-0 -- vault write pki_int/intermediate/set-signed certificate=@/tmp/intermediate.cert.pem
+
+
+                3.5 Создадим и отзовем сертификаты
+                    3.5.1 Создадим роль для выдачи сертификатов
+                        kubectl exec -it vault-0 -- vault write pki_int/roles/example-dot-ru \
+                            allowed_domains="example.ru" allow_subdomains=true max_ttl="720h"
+
+                        kubectl exec -it vault-0 -- vault write pki_int/roles/devlab-dot-ru \
+                            allowed_domains="devlab.ru" allow_subdomains=true max_ttl="720h"
+
+                    3.5.2 Создадим и отзовем
+                        kubectl exec -it vault-0 -- vault write pki_int/issue/devlab-dot-ru common_name="gitlab.devlab.ru" ttl="24h"
+                        kubectl exec -it vault-0 -- vault write pki_int/issue/example-dot-ru common_name="gitlab.example.ru" ttl="24h"
+                        kubectl exec -it vault-0 -- vault write pki_int/revoke \
+                            serial_number="65:de:23:01:54:04:f8:4f:c6:ec:88:3f:00:61:b4:de:4e:5c:c3:4e"
+
+
+                        lex@mebian:~/Документы/otus-kuber/labs/lab11$ kubectl exec -it vault-0 -- vault write pki_int/issue/example-dot-ru common_name="gitlab.example.ru" ttl="24h"
+                        Key                 Value
+                        ---                 -----
+                        ca_chain            [-----BEGIN CERTIFICATE-----
+                        MIIDnDCCAoSgAwIBAgIUPxbg6jkXICJeL6MO4o8CeJqvYlowDQYJKoZIhvcNAQEL
+                        BQAwFTETMBEGA1UEAxMKZXhtYXBsZS5ydTAeFw0xOTExMjQxNTQ5NDNaFw0yNDEx
+                        MjIxNTUwMTNaMCwxKjAoBgNVBAMTIWV4YW1wbGUucnUgSW50ZXJtZWRpYXRlIEF1
+                        dGhvcml0eTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOYf07sfXbDz
+                        mLjxuGkfbd66Bj8Uzt9ChbqViH87XbnNil1hM+ECpXO8SY57gzjRme2v0P2c8jsT
+                        +pBlKKrsWkcYKOm8JskkvrrmHh2Z3COJJDhOuo6hQ1Q/sc4pO17//c5AKhvUoJtW
+                        FOZEE9Uqu70Jwn/BgTgkF10kKMba6lKxfI4JLLEu1vr+FqTJXJSY+PpY7Skc75BA
+                        y3V4w7g77bB9eY5GCaU1MAoFjMRXkSff2GYQZKaFXt5cEGEIPPhx96r/+s6W7NJE
+                        U25CNMYYCEokiHmE6lG5nwuBVvtiX3IVMbyeAQjr7RkNaNMK++t8Hy2jfAy4os8G
+                        ufziaXMmblkCAwEAAaOBzDCByTAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0TAQH/BAUw
+                        AwEB/zAdBgNVHQ4EFgQULYR9LfuThn5k3jKatiYwl6WovrowHwYDVR0jBBgwFoAU
+                        ZMLASX73yqlzA9k+m8yfkeWPTbIwNwYIKwYBBQUHAQEEKzApMCcGCCsGAQUFBzAC
+                        hhtodHRwOi8vdmF1bHQ6ODIwMC92MS9wa2kvY2EwLQYDVR0fBCYwJDAioCCgHoYc
+                        aHR0cDovL3ZhdWx0OjgyMDAvdjEvcGtpL2NybDANBgkqhkiG9w0BAQsFAAOCAQEA
+                        IzUuHqyaC2YSBDsuDO43jiszS5N7Y71vCdyiRf3kVMpVvTF3J6WecAETFBsNOZ/t
+                        sSxSq8ux1poUhC5+/zamMU1zk659IWt865cukGAEzbPpl693vZ9nbsQVZzi6NCiY
+                        0xAJ4n/76TblrUtUpVJxasWsa8xKZo7a/95imFq1QSc0hDhTnGTHJC2/Lp3u6A92
+                        GkI9N3OZ8T44Yvt5lzk3NebqmWJtm5mr2uQMAJ6/kRSvAfmm4xAc2Pygaisz1ZlC
+                        7JL2RLTwy3+6Cmi39XeuNp+zu9fOO34tlnNmxpD/6d8IPAUe+s1D8XED251V9EkZ
+                        Exgov5PMMnt0KHkzmFkhuw==
+                        -----END CERTIFICATE-----]
+                        certificate         -----BEGIN CERTIFICATE-----
+                        MIIDZzCCAk+gAwIBAgIUZd4jAVQE+E/G7Ig/AGG03k5cw04wDQYJKoZIhvcNAQEL
+                        BQAwLDEqMCgGA1UEAxMhZXhhbXBsZS5ydSBJbnRlcm1lZGlhdGUgQXV0aG9yaXR5
+                        MB4XDTE5MTEyNDE2MTA1NloXDTE5MTEyNTE2MTEyNlowHDEaMBgGA1UEAxMRZ2l0
+                        bGFiLmV4YW1wbGUucnUwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQC7
+                        nyCJs0MubAnWZV4nozVOOaJI0VQGIuo5e0A4d6abRSn/y8Det9NU9KgksLJw4WEE
+                        FuxrocLQ0ykZ+is8BySFsH+WammyRdHee4Vmm5IJNcVVCqQtY2onRjTky0eDN6Fx
+                        4KzddNPGvy0wPIWlSrPov/nnW/ZQ8x+Pt4nw8TrdP6yJtEXPq2qmuWQAWf9PAimk
+                        D3BDU8wMHRf5IfQa8jwrNpQ92FR0TAwJaOnXHP4/PE4PFuUzSXQM23C4Ye6B4lvI
+                        sQKvYqHpDZWk2/4Aq3XzceExEFuayiUtf8DKAg8m+ohU0bsIZvVENFyvW+upxl5r
+                        PF3QaqoLNZpuHH0jZAWbAgMBAAGjgZAwgY0wDgYDVR0PAQH/BAQDAgOoMB0GA1Ud
+                        JQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAdBgNVHQ4EFgQUaBAgwSAECMM9+i1Q
+                        oJ8J00F+6OswHwYDVR0jBBgwFoAULYR9LfuThn5k3jKatiYwl6WovrowHAYDVR0R
+                        BBUwE4IRZ2l0bGFiLmV4YW1wbGUucnUwDQYJKoZIhvcNAQELBQADggEBAFC1OSU/
+                        YGiYr/Xrm5JHkajtulHNA8/Bkr7koErpYg4veLbR5JCqhY6yN09HRQ5cSWxsiQAH
+                        rDs5KF1s8x70P98iDtUvby0cSOKC6WvPfwFGm2sBQ1mu87QpGyg/5+F+2seuyLAg
+                        i4TIQ6XwWBu+Z/lb9WLFNy11w9a7qpssabI/518RTnQEHEtW6ewNYolZKISocBQy
+                        Hqv+IRBOXBFpiDwwXdcv/vXb8aE2KuaRVH50LhggHY/LFMxyF4yAefFxyiN21eMs
+                        A5tRNJeT0KFhQI41af2q+fyrOJpHb+vUWSwv86dt8GZrjek0aJD6PclPwuu6WM8R
+                        ewb8jkT+ZHVmRXk=
+                        -----END CERTIFICATE-----
+                        expiration          1574698286
+                        issuing_ca          -----BEGIN CERTIFICATE-----
+                        MIIDnDCCAoSgAwIBAgIUPxbg6jkXICJeL6MO4o8CeJqvYlowDQYJKoZIhvcNAQEL
+                        BQAwFTETMBEGA1UEAxMKZXhtYXBsZS5ydTAeFw0xOTExMjQxNTQ5NDNaFw0yNDEx
+                        MjIxNTUwMTNaMCwxKjAoBgNVBAMTIWV4YW1wbGUucnUgSW50ZXJtZWRpYXRlIEF1
+                        dGhvcml0eTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOYf07sfXbDz
+                        mLjxuGkfbd66Bj8Uzt9ChbqViH87XbnNil1hM+ECpXO8SY57gzjRme2v0P2c8jsT
+                        +pBlKKrsWkcYKOm8JskkvrrmHh2Z3COJJDhOuo6hQ1Q/sc4pO17//c5AKhvUoJtW
+                        FOZEE9Uqu70Jwn/BgTgkF10kKMba6lKxfI4JLLEu1vr+FqTJXJSY+PpY7Skc75BA
+                        y3V4w7g77bB9eY5GCaU1MAoFjMRXkSff2GYQZKaFXt5cEGEIPPhx96r/+s6W7NJE
+                        U25CNMYYCEokiHmE6lG5nwuBVvtiX3IVMbyeAQjr7RkNaNMK++t8Hy2jfAy4os8G
+                        ufziaXMmblkCAwEAAaOBzDCByTAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0TAQH/BAUw
+                        AwEB/zAdBgNVHQ4EFgQULYR9LfuThn5k3jKatiYwl6WovrowHwYDVR0jBBgwFoAU
+                        ZMLASX73yqlzA9k+m8yfkeWPTbIwNwYIKwYBBQUHAQEEKzApMCcGCCsGAQUFBzAC
+                        hhtodHRwOi8vdmF1bHQ6ODIwMC92MS9wa2kvY2EwLQYDVR0fBCYwJDAioCCgHoYc
+                        aHR0cDovL3ZhdWx0OjgyMDAvdjEvcGtpL2NybDANBgkqhkiG9w0BAQsFAAOCAQEA
+                        IzUuHqyaC2YSBDsuDO43jiszS5N7Y71vCdyiRf3kVMpVvTF3J6WecAETFBsNOZ/t
+                        sSxSq8ux1poUhC5+/zamMU1zk659IWt865cukGAEzbPpl693vZ9nbsQVZzi6NCiY
+                        0xAJ4n/76TblrUtUpVJxasWsa8xKZo7a/95imFq1QSc0hDhTnGTHJC2/Lp3u6A92
+                        GkI9N3OZ8T44Yvt5lzk3NebqmWJtm5mr2uQMAJ6/kRSvAfmm4xAc2Pygaisz1ZlC
+                        7JL2RLTwy3+6Cmi39XeuNp+zu9fOO34tlnNmxpD/6d8IPAUe+s1D8XED251V9EkZ
+                        Exgov5PMMnt0KHkzmFkhuw==
+                        -----END CERTIFICATE-----
+                        private_key         -----BEGIN RSA PRIVATE KEY-----
+                        MIIEpQIBAAKCAQEAu58gibNDLmwJ1mVeJ6M1TjmiSNFUBiLqOXtAOHemm0Up/8vA
+                        3rfTVPSoJLCycOFhBBbsa6HC0NMpGforPAckhbB/lmppskXR3nuFZpuSCTXFVQqk
+                        LWNqJ0Y05MtHgzehceCs3XTTxr8tMDyFpUqz6L/551v2UPMfj7eJ8PE63T+sibRF
+                        z6tqprlkAFn/TwIppA9wQ1PMDB0X+SH0GvI8KzaUPdhUdEwMCWjp1xz+PzxODxbl
+                        M0l0DNtwuGHugeJbyLECr2Kh6Q2VpNv+AKt183HhMRBbmsolLX/AygIPJvqIVNG7
+                        CGb1RDRcr1vrqcZeazxd0GqqCzWabhx9I2QFmwIDAQABAoIBAQCfmxur6FJjQEcS
+                        GoOBRqbHF+JE/cXzvmnwYjfckXSqq6ix0NwO2uQtZj9Pjv0NZ70HJJUUbrRyvt89
+                        GQMEerMIA4BWLcoifKCvGfb+taMCsLpgwL+vWN3p8SB37bG1H3L4k/+aGJM7hFBl
+                        s2ahmS349q8ZsLKWZGxZ7vGqhRvlL5tJTStfmw3ETh2EO2jsmIukpleDP5b9htMJ
+                        cXVE0wCXdgtof9NZ7ARc0KCc/z3dlvBxvVKtl53emlNwBuEZAYtiq+N7mN1iol+E
+                        j/ZiyAc40draV/w7KTgV3KVj/UvxN9JTvPqLllIyGORGyni4kxupZK/Q3ha2Eu9T
+                        c4SysoNZAoGBANE5cwEjtNji17KUQsrW97dcncx3k7xL1O7pxAc/ANCMy+VYjpG/
+                        Po5bEJ78L6thzpPMhSWuVSIA+3y1yPWJMOWLlHCI5mrNsLT5zifFV7YQkJwwxhyJ
+                        b9dmJIIUCYU3X/Vofx7XDH1WQmF6srwSJWA9kV2j0SXp7V+gCmJd0dXXAoGBAOWR
+                        SFdX3I4MeFV/GLzoCdIg3QBDhy+Scml2ypaGzL98m8/bp0KrW40PVXrwKRBx1oXE
+                        fMxXFcd2peqo1ts1J9sxrTj3HAsxWYQDo0KlesMJddXrO4k5tVq6NOSIgigglN5L
+                        s/9OIGMgYbVWb2B2jfoaZiPxMNjREZ32z29UYY3dAoGBAMos6o3CVEJ0yZw+GmDp
+                        44vjSnTHZBJDcOrBJ/Uck4vzUiA4N+Rs2mUzaFdJOEMzCyzVKCCmWou2SU5UV3G0
+                        9XQLMhCgqY+xXb0z21uhHcXIMgVMOFRhFpsdj8/GzwBU5zw8kwJZKi9/iDusFkUY
+                        f9eFBxBmeXdamk+aVg6BvIAXAoGBAJUUHpVR4lGAuZhT2/249b+2Ra5JK/3xrUjd
+                        srvDuCzVv91guCKsYtycy5b1ZMVgF75wldag6uzIGQDlOfnKcCKBBQuMNXLzTj1T
+                        m27JRYpol1Qe2V/I0QOlDnomR9fFKMefA7nUw2V7/tei1Nsgwhxbjl7i3yS9yCH7
+                        yEN02ZElAoGAR8cP8HZ40Ryw1gCD5e5/74WE/lsoOTZUKfhCMtp3eqOJG6SoIqo3
+                        ReFd7ATfVskDNp3mlGIQdW3PqrA96Cyh+mwzJdbpNopBm1Yfl6js43eRKdIeCb0Y
+                        xJjVFNbGZf8HWqCBT3PNboi3KZtshpB/RmLgskDsZA8ilCh8ykAtPCw=
+                        -----END RSA PRIVATE KEY-----
+                        private_key_type    rsa
+                        serial_number       65:de:23:01:54:04:f8:4f:c6:ec:88:3f:00:61:b4:de:4e:5c:c3:4e
+
+                        
+                        lex@mebian:~/Документы/otus-kuber/labs/lab11$ kubectl exec -it vault-0 -- vault write pki_int/issue/devlab-dot-ru common_name="gitlab.devlab.ru" ttl="24h"
+                        Key                 Value
+                        ---                 -----
+                        ca_chain            [-----BEGIN CERTIFICATE-----
+                        MIIDnDCCAoSgAwIBAgIUPxbg6jkXICJeL6MO4o8CeJqvYlowDQYJKoZIhvcNAQEL
+                        BQAwFTETMBEGA1UEAxMKZXhtYXBsZS5ydTAeFw0xOTExMjQxNTQ5NDNaFw0yNDEx
+                        MjIxNTUwMTNaMCwxKjAoBgNVBAMTIWV4YW1wbGUucnUgSW50ZXJtZWRpYXRlIEF1
+                        dGhvcml0eTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOYf07sfXbDz
+                        mLjxuGkfbd66Bj8Uzt9ChbqViH87XbnNil1hM+ECpXO8SY57gzjRme2v0P2c8jsT
+                        +pBlKKrsWkcYKOm8JskkvrrmHh2Z3COJJDhOuo6hQ1Q/sc4pO17//c5AKhvUoJtW
+                        FOZEE9Uqu70Jwn/BgTgkF10kKMba6lKxfI4JLLEu1vr+FqTJXJSY+PpY7Skc75BA
+                        y3V4w7g77bB9eY5GCaU1MAoFjMRXkSff2GYQZKaFXt5cEGEIPPhx96r/+s6W7NJE
+                        U25CNMYYCEokiHmE6lG5nwuBVvtiX3IVMbyeAQjr7RkNaNMK++t8Hy2jfAy4os8G
+                        ufziaXMmblkCAwEAAaOBzDCByTAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0TAQH/BAUw
+                        AwEB/zAdBgNVHQ4EFgQULYR9LfuThn5k3jKatiYwl6WovrowHwYDVR0jBBgwFoAU
+                        ZMLASX73yqlzA9k+m8yfkeWPTbIwNwYIKwYBBQUHAQEEKzApMCcGCCsGAQUFBzAC
+                        hhtodHRwOi8vdmF1bHQ6ODIwMC92MS9wa2kvY2EwLQYDVR0fBCYwJDAioCCgHoYc
+                        aHR0cDovL3ZhdWx0OjgyMDAvdjEvcGtpL2NybDANBgkqhkiG9w0BAQsFAAOCAQEA
+                        IzUuHqyaC2YSBDsuDO43jiszS5N7Y71vCdyiRf3kVMpVvTF3J6WecAETFBsNOZ/t
+                        sSxSq8ux1poUhC5+/zamMU1zk659IWt865cukGAEzbPpl693vZ9nbsQVZzi6NCiY
+                        0xAJ4n/76TblrUtUpVJxasWsa8xKZo7a/95imFq1QSc0hDhTnGTHJC2/Lp3u6A92
+                        GkI9N3OZ8T44Yvt5lzk3NebqmWJtm5mr2uQMAJ6/kRSvAfmm4xAc2Pygaisz1ZlC
+                        7JL2RLTwy3+6Cmi39XeuNp+zu9fOO34tlnNmxpD/6d8IPAUe+s1D8XED251V9EkZ
+                        Exgov5PMMnt0KHkzmFkhuw==
+                        -----END CERTIFICATE-----]
+                        certificate         -----BEGIN CERTIFICATE-----
+                        MIIDZTCCAk2gAwIBAgIUR5qnAb6qAMKLmhjbzVn8k3HrNUwwDQYJKoZIhvcNAQEL
+                        BQAwLDEqMCgGA1UEAxMhZXhhbXBsZS5ydSBJbnRlcm1lZGlhdGUgQXV0aG9yaXR5
+                        MB4XDTE5MTEyNDE2MTYwNloXDTE5MTEyNTE2MTYzNVowGzEZMBcGA1UEAxMQZ2l0
+                        bGFiLmRldmxhYi5ydTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAKrl
+                        G9kCFsiS33smVQmqBu4q7JCpXBr2ExenN8pU3o983AaQ6MiEzLni14u+t4Jil0Uo
+                        Ns1d8PN9bt3TtDeQocPTWkHFH4HhFppJChaEW8pr1hqvMFJz1ASpaIuLm5lAYUaU
+                        fbHKQx+0rKx9XUK+GgA95nqexx1MR97JWbmhS0Du+aQ0u0zJjozRP0ZPvdkdYF+N
+                        r6Le6i31VP8ZKQroPhPyarPH5JvbIglA/b5MpJ2Q6REvTCESZDTIsDy53cMTdeas
+                        Xa+JEc/P3KVS4PiOQTnNUrc59jNuZX45ByglHyCw89wyLrYYR/IQL5U0AHYo4Km4
+                        TE8+shADE+DDuAN+VHECAwEAAaOBjzCBjDAOBgNVHQ8BAf8EBAMCA6gwHQYDVR0l
+                        BBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMB0GA1UdDgQWBBRzqhASbJIVeZ96Yb2Z
+                        BPgpJC/+5DAfBgNVHSMEGDAWgBQthH0t+5OGfmTeMpq2JjCXpai+ujAbBgNVHREE
+                        FDASghBnaXRsYWIuZGV2bGFiLnJ1MA0GCSqGSIb3DQEBCwUAA4IBAQBL8PwXYvJ0
+                        mdfLrLOP9wXw0c1hD5BT2lL7D+GuZenHF6+/aEFR0wtCom0Sbbcq87fqeOW3xzwk
+                        sE8NE6qLbpqPYmAEct9av4YooqMVGnWiAEt75R+WxPirfEYsQYrKAeSfULGLz7rr
+                        6K785AudAqrOXXGIoXH5TiYPj5LIgZy66e02HQFutrYD+7kCqu0E9ke9/Z4Prapv
+                        H633Pu0PIwJgOOB/D2NfhY4KaZSvj31RFbMqSZ31tSO+Sr2oDXei5yRL5OZTbux2
+                        TJxZN0pdDvt01LpfUdDs0JgmPXBIy/xbG6ZR7TTiTkLt1EopVDXWFsyRUpIhjHJq
+                        W1lbk2PLSCya
+                        -----END CERTIFICATE-----
+                        expiration          1574698595
+                        issuing_ca          -----BEGIN CERTIFICATE-----
+                        MIIDnDCCAoSgAwIBAgIUPxbg6jkXICJeL6MO4o8CeJqvYlowDQYJKoZIhvcNAQEL
+                        BQAwFTETMBEGA1UEAxMKZXhtYXBsZS5ydTAeFw0xOTExMjQxNTQ5NDNaFw0yNDEx
+                        MjIxNTUwMTNaMCwxKjAoBgNVBAMTIWV4YW1wbGUucnUgSW50ZXJtZWRpYXRlIEF1
+                        dGhvcml0eTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAOYf07sfXbDz
+                        mLjxuGkfbd66Bj8Uzt9ChbqViH87XbnNil1hM+ECpXO8SY57gzjRme2v0P2c8jsT
+                        +pBlKKrsWkcYKOm8JskkvrrmHh2Z3COJJDhOuo6hQ1Q/sc4pO17//c5AKhvUoJtW
+                        FOZEE9Uqu70Jwn/BgTgkF10kKMba6lKxfI4JLLEu1vr+FqTJXJSY+PpY7Skc75BA
+                        y3V4w7g77bB9eY5GCaU1MAoFjMRXkSff2GYQZKaFXt5cEGEIPPhx96r/+s6W7NJE
+                        U25CNMYYCEokiHmE6lG5nwuBVvtiX3IVMbyeAQjr7RkNaNMK++t8Hy2jfAy4os8G
+                        ufziaXMmblkCAwEAAaOBzDCByTAOBgNVHQ8BAf8EBAMCAQYwDwYDVR0TAQH/BAUw
+                        AwEB/zAdBgNVHQ4EFgQULYR9LfuThn5k3jKatiYwl6WovrowHwYDVR0jBBgwFoAU
+                        ZMLASX73yqlzA9k+m8yfkeWPTbIwNwYIKwYBBQUHAQEEKzApMCcGCCsGAQUFBzAC
+                        hhtodHRwOi8vdmF1bHQ6ODIwMC92MS9wa2kvY2EwLQYDVR0fBCYwJDAioCCgHoYc
+                        aHR0cDovL3ZhdWx0OjgyMDAvdjEvcGtpL2NybDANBgkqhkiG9w0BAQsFAAOCAQEA
+                        IzUuHqyaC2YSBDsuDO43jiszS5N7Y71vCdyiRf3kVMpVvTF3J6WecAETFBsNOZ/t
+                        sSxSq8ux1poUhC5+/zamMU1zk659IWt865cukGAEzbPpl693vZ9nbsQVZzi6NCiY
+                        0xAJ4n/76TblrUtUpVJxasWsa8xKZo7a/95imFq1QSc0hDhTnGTHJC2/Lp3u6A92
+                        GkI9N3OZ8T44Yvt5lzk3NebqmWJtm5mr2uQMAJ6/kRSvAfmm4xAc2Pygaisz1ZlC
+                        7JL2RLTwy3+6Cmi39XeuNp+zu9fOO34tlnNmxpD/6d8IPAUe+s1D8XED251V9EkZ
+                        Exgov5PMMnt0KHkzmFkhuw==
+                        -----END CERTIFICATE-----
+                        private_key         -----BEGIN RSA PRIVATE KEY-----
+                        MIIEpAIBAAKCAQEAquUb2QIWyJLfeyZVCaoG7irskKlcGvYTF6c3ylTej3zcBpDo
+                        yITMueLXi763gmKXRSg2zV3w831u3dO0N5Chw9NaQcUfgeEWmkkKFoRbymvWGq8w
+                        UnPUBKloi4ubmUBhRpR9scpDH7SsrH1dQr4aAD3mep7HHUxH3slZuaFLQO75pDS7
+                        TMmOjNE/Rk+92R1gX42vot7qLfVU/xkpCug+E/Jqs8fkm9siCUD9vkyknZDpES9M
+                        IRJkNMiwPLndwxN15qxdr4kRz8/cpVLg+I5BOc1Stzn2M25lfjkHKCUfILDz3DIu
+                        thhH8hAvlTQAdijgqbhMTz6yEAMT4MO4A35UcQIDAQABAoIBAHo7/bsuf1VfmHHh
+                        bRnIf8SC90pRmQu/ztAwTvtt0PMY/9fCdn5WXojm8/2EoIWmN0TECs7BzsKaiV4p
+                        OtIzpUEIP5qjgHHJqf0ZGRoZ+f3DPBVCEXIoXxImihyl8tme7vUo6O7uGSzockm+
+                        MaK3jql1nRE/2HPgR9fWdVMNR2JdYEAfth7moBzbuTwU8R4gtMrkCuZ5ThW8NNSa
+                        d7HBMQ85f1vbAJUJUJVxtjl3OppsnMetqWAO+y1PPiG9UOa4e8AIDc6p50A+SZaP
+                        KozGA+89zyfpDXX99Hg7sclRKEufe/N0c3BFtoFKrskf/dIlQIUpXpaNIBLEC3VN
+                        yGqlIkECgYEAwsSDktTvBkmTvCG8kr2EJqG7K02LDIHM7Bj/jGBhe9ArjU8cwhgD
+                        4KeXnxjkQ7ScThGlPAZF7AAGYGgll+fbpX3yegYA79LqBw1ThBlC5Tm3kD8rgFHa
+                        bT7BwVBtj3PZRnFQIamshqiscbKAmugkvJO0yoX7W2GKyTJQCtu95Z0CgYEA4J8/
+                        97I4E898N6t/rRyX67a9ct2SqrayR9I/NJL5CSvBXh4eV56iVpmBor22j5rzpgzU
+                        Wf8Y895IqSun5aEllPz9Ai+/ivDUvd2XVNsCeyTtgiBeu519oX1wW9tTw9u5CAkr
+                        MZG2RkieWeF78DbcN0CqmYgwUbksWMku5jvL++UCgYEAweZcSui8EdlcP9aiYsBT
+                        +RXYPbMUNF5hAcedWkZ1porHYQYazkyUR6rxcs2YKqN7XOmKQ6jHIb2gm4fzrTiB
+                        3k72AG9LrXaf0Gd+9qsjgwuj6PJKv5Q9zbbFtEv61u7xp4SVzv2ZqfHww7x+9jkY
+                        obi3K0yZwg7o2YbCUx0S/60CgYEA2wSsfLq7zyU6u5Vvcr40q9ONOhkuT2LAxyMM
+                        GhlM1lJhw4GemFTHeaVIMATHo5K1DC3qSK5iCDevpbQ5i7/rQzDDCoTAQZu99DvC
+                        uSyraKODKqShelKAExyamBZtwMXXzywRf83SawmXzY/9JyZ25zEYp4eRhb4GrbPN
+                        FRUtOrkCgYBLDVXYNieUhuqXaURUAdd9Z3rzDVA3cSENiderOPBnAZo7NBIfM99R
+                        HKDN94PCpjS4L1xcb9osbR1YfFl2KanrbhciCF2UdQ5fb4YLTfzH7QOoE9LJvXuI
+                        s5HPP/rveej1zNXHKI0XO92gp9kNufs02WmaTEbD3LxCRioxBgMFOQ==
+                        -----END RSA PRIVATE KEY-----
+                        private_key_type    rsa
+                        serial_number       47:9a:a7:01:be:aa:00:c2:8b:9a:18:db:cd:59:fc:93:71:eb:35:4c
+
+
+                        lex@mebian:~/Документы/otus-kuber/labs/lab11$ kubectl exec -it vault-0 -- vault write pki_int/revoke                             serial_number="65:de:23:01:54:04:f8:4f:c6:ec:88:3f:00:61:b4:de:4e:5c:c3:4e"
+                        Key                        Value
+                        ---                        -----
+                        revocation_time            1574612745
+                        revocation_time_rfc3339    2019-11-24T16:25:45.926715486Z
